@@ -31,7 +31,7 @@ The output should be:
 cgroup2fs
 ```
 
-If you want to know the differences between v1 and v2 read [here](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst#:~:text=using%20bio_associate_blkg()%0Adirectly.-,Deprecated%20v1%20Core%20Features,-%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%0A%0A%2D%20Multiple).
+If you want to know the differences between v1 and v2 read [here](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst#:~:text=using%20bio_associate_blkg()%0Adirectly.-,Deprecated%20v1%20Core%20Features,-%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%0A%0A%2D%20Multiple) or watch this [talk](https://youtu.be/ikZ8_mRotT4)
 
 
 ## 0. Exploring the cgroups v2 filesystem
@@ -391,7 +391,7 @@ This one is fun, now that we are done with our processes, let's kill them all by
 ```bash
 echo 1 > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/cgroup.kill
 ```
-After you press enter you will see all the processes have been killed:
+After you press enter twice you will see all the processes have been killed:
 
 ```output
 echo 1 > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/cgroup.kill
@@ -509,8 +509,6 @@ In this guide we have been using mostly `cgroup-tools` to manage our cgroups but
 
 
 
-
-
 ## Resources
 
 This is a list of resources that were helpful in the creation of this guide:
@@ -530,6 +528,10 @@ https://medium.com/some-tldrs/tldr-understanding-the-new-control-groups-api-by-r
 https://facebookmicrosites.github.io/cgroup2/docs/overview.html
 
 https://kubernetes.io/docs/concepts/architecture/cgroups/
+
+https://youtu.be/ikZ8_mRotT4
+
+https://youtu.be/LX6fMlIYZcg
 
 https://chrisdown.name/talks/cgroupv2/cgroupv2-fosdem.pdf
 
