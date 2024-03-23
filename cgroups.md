@@ -64,7 +64,7 @@ The directory `/sys/fs/cgroup` represents the root cgroup in your system, direct
 
 I am not going to go into detail describing all these files, that's what the [man page](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst) is for, but I will give an overview of their type so we can understand their classification.
 
-> You will also find directories (child cgroups) like `init.scope`, `user.slice` and `system.slice`. I won't talk about them here but if you are curious you can find out more [here](https://medium.com/@charles.vissol/systemd-and-cgroup-7eb80a08234d). 
+> The directories here represent child cgroups. The ones present now `init.scope`, `user.slice` and `system.slice`. I won't talk about them here but if you are curious you can learn more [here](https://medium.com/@charles.vissol/systemd-and-cgroup-7eb80a08234d). 
 
 
 ### Types of files in the cgroups filesystem
@@ -117,8 +117,8 @@ Except for the `cgroup` prefix which controls core configuration and status of t
 Before we move onwards, export these variables, you can change the values to whatever you want:
 
 ```bash
-export ROOT_CGROUP=containers
-export CONTAINER_CGROUP=goofytimes
+export PARENT_CGROUP=containers
+export CHILD_CGROUP=goofytimes
 ```
 
 Also, you may need to install `cgtools` in your system, you can do so with the following command in Debian based systems:
@@ -130,12 +130,12 @@ apt -y install cgroup-tools
 Now let's create our root cgroup
 
 ```bash
-cgcreate -g memory,cpu:/${ROOT_CGROUP}
+cgcreate -g memory,cpu:/${PARENT_CGROUP}
 ```
 If you got no output, then that's probably a good sign, let's check that it was indeed created and what's inside it:
 
 ```bash
-ls /sys/fs/cgroup/${ROOT_CGROUP}
+ls /sys/fs/cgroup/${PARENT_CGROUP}
 ```
 Output:
 
@@ -155,7 +155,7 @@ You will notice that our cgroup has the `pids` controller enabled, but why? We s
 Let's take a look at the controllers enabled in this directory with the following command:
 
 ```bash
-cat /sys/fs/cgroup/${ROOT_CGROUP}/cgroup.controllers
+cat /sys/fs/cgroup/${PARENT_CGROUP}/cgroup.controllers
 ```
 Which gives the following output:
 
@@ -174,36 +174,36 @@ This gives the exact same output as the file `cgroup_controllers` in our new cgr
 cpu memory pids
 ```
 
-That means that all children of the root cgroup will have those controllers enabled (but not necessarily its grandchildren), on the other hand, if you look into the file under `$ROOT_CGROUP`
+That means that all children of the root cgroup will have those controllers enabled (but not necessarily its grandchildren), on the other hand, if you look into the file under `$PARENT_CGROUP`
 
 ```bash
-cat /sys/fs/cgroup/${ROOT_CGROUP}/cgroup.subtree_control
+cat /sys/fs/cgroup/${PARENT_CGROUP}/cgroup.subtree_control
 ```
 It returns nothing, meaning we can change it and add our own `subtree_control` here, but only for the controllers enabled in this cgroup. 
 
-If we run same command from earlier again to create a child for our cgroup named `$CONTAINER_CGROUP`:
+If we run same command from earlier again to create a child for our cgroup named `$CHILD_CGROUP`:
 
 ```bash
-cgcreate -g memory,cpu:/${ROOT_CGROUP}/${CONTAINER_CGROUP}
+cgcreate -g memory,cpu:/${PARENT_CGROUP}/${CHILD_CGROUP}
 ```
 
-And we look again within the `cgroup.subtree_control` under `${ROOT_CGROUP}`, then we see that now the right controllers are added:
+And we look again within the `cgroup.subtree_control` under `${PARENT_CGROUP}`, then we see that now the right controllers are added:
 
 ```
-# cat /sys/fs/cgroup/${ROOT_CGROUP}/cgroup.subtree_control
+# cat /sys/fs/cgroup/${PARENT_CGROUP}/cgroup.subtree_control
 cpu memory
 ```
 
-That means that any children under `{$ROOT_CGROUP}` will now have `cpu` and `memory` controllers enabled by default.
+That means that any children under `{$PARENT_CGROUP}` will now have `cpu` and `memory` controllers enabled by default.
 
 
-> Note that any cgroup that has `subtree_control` enabled cannot have any processes of its own, EXCEPT the root cgroup (not our root cgroup, but the root at `/sys/fs/cgroup`). That means you won't be able to assign any processes to `${ROOT_CGROUP}`, only to `${ROOT_CGROUP}/${CONTAINER_CGROUP}` or any other directory created under `${ROOT_CGROUP}` that doesn't have `subtree_control` enabled. Read more about it in the man page under [No Internal Process Constraint](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst#:~:text=have%20it%20enabled.-,No%20Internal%20Process%20Constraint,-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~%0A%0ANon%2Droot)
+> Note that any cgroup that has `subtree_control` enabled cannot have any processes of its own, EXCEPT the root cgroup (`/sys/fs/cgroup`). That means you won't be able to assign any processes to `${PARENT_CGROUP}`, only to `${PARENT_CGROUP}/${CHILD_CGROUP}` or any other directory created under `${PARENT_CGROUP}` that doesn't have `subtree_control` enabled. Read more about it in the man page under [No Internal Process Constraint](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst#:~:text=have%20it%20enabled.-,No%20Internal%20Process%20Constraint,-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~%0A%0ANon%2Droot)
 
 
-And if we look at the new cgroup folder for `${CONTAINER_CGROUP}`:
+And if we look at the new cgroup folder for `${CHILD_CGROUP}`:
 
 ```
-ls /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}
+ls /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}
 ```
 
 We get the following output:
@@ -231,22 +231,24 @@ In this section we are going to test adding maximum cpu limits and memory limits
 * `memory.max:`: maximum RAM (around 100MB in bytes), but the process can still use swap!
 * `memory.swap.max`: limit the amount of swap the process can use, also 100 MB
 
-> The CPU limits don't kill a process but memory limits will if the process tries to use more memory than it has available to it and cgroups cannot effectively throttle it by forcing the agent controlling the process to reclaim memory. By setting a limit for swap we are essentially forcing the process to die much sooner than it otherwise would - which may not be what you want in a production system, but it works well for our demonstration.
+> `cpu.max` sets a hard limit to the process, meaning the cpu for the entire cgroup will not go above around 10%, to be shared among all the processes, cpu throttling never kills a process. 
+
+>`memory.max`: if the memory gets above the limit specified here, the kernel will enforce it by throttling the memory usage of the cgroup. Throttling means increasing memory pressure which, leads the kernel to reduce memory allocation requests and aggressively reclaim memory from the cgroup, this involves freeing data from memory that's not needed or swapping it out to disk (depending on swappiness setting). If that fails, it will trigger a OOM kill for the process in the cgroup with the highest OOM score. By setting both `memory.max` and `memory.swap.max` we are essentially forcing an early OOM for the tests we are going to perform ahead in this guide because the kernel will be unable to reclaim a lot of memory into swap. The criteria that determines OOM score and what you can do to protect a process from triggering OOM kill can be found [here](https://man7.org/linux/man-pages/man5/proc.5.html#:~:text=in%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20Linux%203.7.-,/proc/pid/oom_score,-(since%20Linux%202.6.11))
 
 Let's set these three:
 
 ```bash
-cgset -r memory.max=100000000 ${ROOT_CGROUP}/${CONTAINER_CGROUP}
-cgset -r memory.swap.max=100000000 ${ROOT_CGROUP}/${CONTAINER_CGROUP}
-cgset -r cpu.max="100000 1000000" ${ROOT_CGROUP}/${CONTAINER_CGROUP}
+cgset -r memory.max=100000000 ${PARENT_CGROUP}/${CHILD_CGROUP}
+cgset -r memory.swap.max=100000000 ${PARENT_CGROUP}/${CHILD_CGROUP}
+cgset -r cpu.max="100000 1000000" ${PARENT_CGROUP}/${CHILD_CGROUP}
 ```
 
-> The values for `memory` are set in bytes here, for cpu is set to `$MAX $PERIOD`, you can think of it as stating that for every one million microseconds (one second) the cpu can only be used for one hundred thousand microseconds (tenth of a second), so around 10% limit. You can actually adjust this ratio to as low as `"1000 10000"` if you prefer as well for a similar result.
+> The values for `memory` are set in bytes here (but could also do `100M` for 100 megs, or `1G` for one 1gig, and so on), for cpu is set to `$MAX $PERIOD`, you can think of it as stating that for every one million microseconds (one second) the cpu can only be used for one hundred thousand microseconds (tenth of a second), so around 10% limit. You can actually adjust this ratio to as low as `"1000 10000"` if you prefer as well for a similar result.
 
 We can double check the values were added with this command:
 
 ```bash
-cat /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}/{memory,cpu,memory.swap}.max
+cat /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/{memory,cpu,memory.swap}.max
 ```
 
 Which will yield the output:
@@ -282,7 +284,7 @@ When you run these commands you are likely going to get a CPU output of nearly 1
 Now let's enter a bash terminal that's inside the cgroup we created like so:
 
 ```bash
-cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} bash
+cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} bash
 ```
 
 Run the same command block to test our CPU above and notice the difference:
@@ -303,7 +305,7 @@ Let's now run this command within our bash cgrouped process from above:
 echo $(tr -d '\0' < /dev/urandom | head -c200M) > /dev/null &
 ```
 
-This creates a very large variable of 200 MBs, which overuns the roughly 100 MB limit we imposed earlier (Actually this command seems to use significantly more than just 200MBs, not sure why). Hence, it will eventually kill the process, but in the meantime we can watch the memory and swap grow on the way to death with the following command:
+This creates a very large variable of 200 MBs, which overloads the roughly 100 MB limit we imposed earlier. Hence, it will eventually kill the process, but in the meantime we can watch the memory and swap grow on the way to death with the following command:
 
 ```bash
 watch ps -p $! -o rss,sz
@@ -327,8 +329,12 @@ Once you see the process die, you can exit the bash process that's on the cgroup
 exit
 ```
 
-## 4. cgroups top (table of processes) and ls (list)
+### Can you prevent cgroups from killing processes that use too much memory?
 
+Yes, if you use `memory.high` and `memory.swap.max` instead what will happen in the above scenario is that the process will fill the memory as much as it can and then enter a `D` uninterruptible state until an agent or another process frees memory up. This may be a more desirable scenario for most cases and it acts as a soft limit. 
+
+
+## 4. cgroups top (table of processes) and ls (list)
 
 `systemd-cgls` and `systemd-cgtop` are equivalent to `ls` and `top` for cgroups.
 
@@ -337,8 +343,8 @@ exit
 First, it's worth noting that if a cgroup doesn't have any processes assigned to it, it will not show on `systemd-cgtop`, therefore we will run a few commands inside our cgroup to check it out.
 
 ```bash
-for p in {1..5} ; do cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 2000 & done
-cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} yes > /dev/null &
+for p in {1..5} ; do cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 2000 & done
+cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} yes > /dev/null &
 ```
 
 Now that we have a few processes running:
@@ -383,18 +389,18 @@ Control group /containers:
 This one is fun, now that we are done with our processes, let's kill them all by running the following command:
 
 ```bash
-echo 1 > /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}/cgroup.kill
+echo 1 > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/cgroup.kill
 ```
 After you press enter you will see all the processes have been killed:
 
 ```output
-echo 1 > /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}/cgroup.kill
-[6]   Killed                  cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 2000
-[7]   Killed                  cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 2000
-[8]   Killed                  cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 2000
-[9]   Killed                  cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 2000
-[10]-  Killed                 cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 2000
-[11]+  Killed                 cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} yes > /dev/null
+echo 1 > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/cgroup.kill
+[6]   Killed                  cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 2000
+[7]   Killed                  cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 2000
+[8]   Killed                  cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 2000
+[9]   Killed                  cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 2000
+[10]-  Killed                 cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 2000
+[11]+  Killed                 cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} yes > /dev/null
 # systemd-cgls /containers
 Control group /containers:
 # No processes
@@ -424,7 +430,7 @@ The output:
 Our `yes` process is using 100% CPU but we want to limit it to 10% again. Time to cage that baby:
 
 ```bash
-cgclassify -g cpu,memory:${ROOT_CGROUP}/${CONTAINER_CGROUP} $!
+cgclassify -g cpu,memory:${PARENT_CGROUP}/${CHILD_CGROUP} $!
 ```
 
 We are using `$!` to substitute for the last command we put on the background, now here something strange happens, if you run our command to check the CPU:
@@ -446,7 +452,7 @@ If you want to get an overview of the configuration parameters for a cgroup, we 
 
 Running:
 ```bash
-cgget ${ROOT_CGROUP}/${CONTAINER_CGROUP}
+cgget ${PARENT_CGROUP}/${CHILD_CGROUP}
 ```
 Yields something like this (output truncated):
 
@@ -479,7 +485,7 @@ memory.events: low 0
  You have reached the end of our journey and can go ahead and delete the cgroups we just created, this command will recursively delete both:
 
 ```bash
-cgdelete -r -g cpu:/${ROOT_CGROUP}
+cgdelete -r -g cpu:/${PARENT_CGROUP}
 ```
 
 > Did you notice how in the commands `cgexec` and `cgdelete` we are specifying the controller even though it seemingly doesn't matter? Well, it doesn't really matter. The command requires it, but this is only because in cgroups v1 the hierarchy was done according to controllers, but in v2 this is not the case anymore, but the cgroups commands work with both version so I am guessing it will stay like this for a while for backwards compatibility.
@@ -489,17 +495,19 @@ cgdelete -r -g cpu:/${ROOT_CGROUP}
 
 In this guide we have been using mostly `cgroup-tools` to manage our cgroups but you can largely do all of this by interacting directly with cgroups filesystem, This is a list of commands and their equivalent:
 
-`cgcreate -g memory,cpu:/${ROOT_CGROUP}/${CONTAINER_CGROUP}` --> `mkdir /sys/fs/cgroup/${ROOT_CGROUP}/ && echo "+cpu +memory" > /sys/fs/cgroup/${ROOT_CGROUP}/cgroup.subtree_control && mkdir /sys/fs/cgroup/${ROOT_CGROUP}/{CONTAINER_CGROUP}`
+`cgcreate -g memory,cpu:/${PARENT_CGROUP}/${CHILD_CGROUP}` --> `mkdir /sys/fs/cgroup/${PARENT_CGROUP}/ && echo "+cpu +memory" > /sys/fs/cgroup/${PARENT_CGROUP}/cgroup.subtree_control && mkdir /sys/fs/cgroup/${PARENT_CGROUP}/{CHILD_CGROUP}`
 
-`cgset -r memory.max=100000000 ${ROOT_CGROUP}/${CONTAINER_CGROUP}` --> `echo 100000000 > /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}/memory.max`
+`cgset -r memory.max=100000000 ${PARENT_CGROUP}/${CHILD_CGROUP}` --> `echo 100000000 > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/memory.max`
 
-`cgexec -g memory,cpu:${ROOT_CGROUP}/${CONTAINER_CGROUP} sleep 200 &` --> `sleep 200 & echo $! > /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}/cgroup.procs`
+`cgexec -g memory,cpu:${PARENT_CGROUP}/${CHILD_CGROUP} sleep 200 &` --> `sleep 200 & echo $! > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/cgroup.procs`
 
-`cgclassify -g cpu,memory:${ROOT_CGROUP}/${CONTAINER_CGROUP} $$` --> `echo $$ > /sys/fs/cgroup/${ROOT_CGROUP}/${CONTAINER_CGROUP}/cgroup.procs`
+`cgclassify -g cpu,memory:${PARENT_CGROUP}/${CHILD_CGROUP} $$` --> `echo $$ > /sys/fs/cgroup/${PARENT_CGROUP}/${CHILD_CGROUP}/cgroup.procs`
 
 `systemd-cgls -a` --> `find /sys/fs/cgroup -type f -name cgroup.procs -exec sh -c 'echo \\n"\e[1;31m$1\e[0m" :; output=$(tr "\n" " " < "$1"); if [ -n "$output" ]; then echo "$output" | xargs ps -o pid -o cmd -p; else echo "No processes found on this cgroup folder" ;fi' _ {} \;` -->  `ps -eo pid,comm,cgroup,%cpu,%mem`
 
-`cgdelete -r -g cpu:/${ROOT_CGROUP}` --> `rmdir -p /sys/fs/cgroup/${ROOT_CGROUP}/{CONTAINER_CGROUP}`
+`cgdelete -r -g cpu:/${PARENT_CGROUP}` --> `rmdir -p /sys/fs/cgroup/${PARENT_CGROUP}/{CHILD_CGROUP}`
+
+
 
 
 
@@ -528,6 +536,8 @@ https://chrisdown.name/talks/cgroupv2/cgroupv2-fosdem.pdf
 https://systemd.io/CGROUP_DELEGATION/
 
 https://btholt.github.io/complete-intro-to-containers/
+
+
 
 ## About the author
 
