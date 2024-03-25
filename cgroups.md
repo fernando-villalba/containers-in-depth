@@ -31,7 +31,7 @@ The output should be:
 cgroup2fs
 ```
 
-If you want to know the differences between v1 and v2 read [here](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst#:~:text=using%20bio_associate_blkg()%0Adirectly.-,Deprecated%20v1%20Core%20Features,-%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%0A%0A%2D%20Multiple) or watch this [talk](https://youtu.be/ikZ8_mRotT4)
+If you want to know the differences between v1 and v2 read [here](https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst#:~:text=using%20bio_associate_blkg()%0Adirectly.-,Deprecated%20v1%20Core%20Features,-%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%3D%0A%0A%2D%20Multiple) or watch this [talk](https://youtu.be/ikZ8_mRotT4). [Here](https://youtu.be/u8h0e84HxcE?t=760) are a list of issues with cgroup v1 that cgroup v2 solves.
 
 
 ## 0. Exploring the cgroups v2 filesystem
@@ -233,7 +233,8 @@ In this section we are going to test adding maximum cpu limits and memory limits
 
 > `cpu.max` sets a hard limit to the process, meaning the cpu for the entire cgroup will not go above around 10%, to be shared among all the processes, cpu throttling never kills a process. 
 
->`memory.max`: if the memory gets above the limit specified here, the kernel will enforce it by throttling the memory usage of the cgroup. Throttling means increasing memory pressure which, leads the kernel to reduce memory allocation requests and aggressively reclaim memory from the cgroup, this involves freeing data from memory that's not needed or swapping it out to disk (depending on swappiness setting). If that fails, it will trigger a OOM kill for the process in the cgroup with the highest OOM score. By setting both `memory.max` and `memory.swap.max` we are essentially forcing an early OOM for the tests we are going to perform ahead in this guide because the kernel will be unable to reclaim a lot of memory into swap. The criteria that determines OOM score and what you can do to protect a process from triggering OOM kill can be found [here](https://man7.org/linux/man-pages/man5/proc.5.html#:~:text=in%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20Linux%203.7.-,/proc/pid/oom_score,-(since%20Linux%202.6.11))
+>`memory.max`: if the memory gets above the limit specified here, the kernel will enforce it by throttling the memory usage of the cgroup. Throttling means increasing memory pressure which, leads the kernel to reduce memory allocation requests and aggressively reclaim memory from the cgroup, this involves freeing data from memory that's not needed or swapping it out to disk (depending on swappiness setting). If that fails, it will trigger a OOM kill for the process in the cgroup with the highest OOM score. By setting both `memory.max` and `memory.swap.max` we are essentially forcing an early OOM for the tests we are going to perform ahead in this guide because the kernel will be unable to reclaim a lot of memory into swap. The criteria that determines OOM score and what you can do to protect a process from triggering OOM kill can be found [here](https://man7.org/linux/man-pages/man5/proc.5.html#:~:text=in%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20Linux%203.7.-,/proc/pid/oom_score,-(since%20Linux%202.6.11)). 
+
 
 Let's set these three:
 
@@ -331,7 +332,13 @@ exit
 
 ### Can you prevent cgroups from killing processes that use too much memory?
 
-Yes, if you use `memory.high` and `memory.swap.max` instead what will happen in the above scenario is that the process will fill the memory as much as it can and then enter a `D` uninterruptible state until an agent or another process frees memory up. This may be a more desirable scenario for most cases and it acts as a soft limit. 
+Yes, if you use `memory.high` and `memory.swap.high` instead what will happen in the above scenario is that the process will fill the memory as much as it can and then enter a `D` uninterruptible state until an agent or another process frees memory up. This may be a more desirable scenario for most cases as it acts as a softer limit.
+
+This graph shows the different memory protection levels you can assign to a process within a cgroup:
+
+<img src="images/memory_protection.png" width="500" height="500" />
+
+[Image source](https://youtu.be/u8h0e84HxcE)
 
 
 ## 4. cgroups top (table of processes) and ls (list)
@@ -513,6 +520,14 @@ In this guide we have been using mostly `cgroup-tools` to manage our cgroups but
 
 This is a list of resources that were helpful in the creation of this guide:
 
+[Kubernetes On cgroup v2 - Giuseppe Scrivano, Red Hat (video)](https://youtu.be/u8h0e84HxcE)
+
+[cgroupv2: Linux's new unified control group hierarchy - Chris Down (video)](https://youtu.be/ikZ8_mRotT4)
+
+https://chrisdown.name/talks/cgroupv2/cgroupv2-fosdem.pdf
+
+[7 years of cgroup v2: the future of Linux resource control - Chris Down (Video)](https://youtu.be/LX6fMlIYZcg)
+
 https://docs.kernel.org/admin-guide/cgroup-v2.html
 
 https://git.kernel.org/pub/scm/linux/kernel/git/tj/cgroup.git/tree/Documentation/admin-guide/cgroup-v2.rst
@@ -529,19 +544,13 @@ https://facebookmicrosites.github.io/cgroup2/docs/overview.html
 
 https://kubernetes.io/docs/concepts/architecture/cgroups/
 
-https://youtu.be/ikZ8_mRotT4
-
-https://youtu.be/LX6fMlIYZcg
-
-https://chrisdown.name/talks/cgroupv2/cgroupv2-fosdem.pdf
-
 https://systemd.io/CGROUP_DELEGATION/
 
 https://btholt.github.io/complete-intro-to-containers/
 
-[Kubernetes on cgroup V2](https://youtu.be/u8h0e84HxcE)
 
-https://youtu.be/u8h0e84HxcE
+
+
 
 
 
