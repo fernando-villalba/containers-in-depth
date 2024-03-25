@@ -539,6 +539,11 @@ https://systemd.io/CGROUP_DELEGATION/
 
 https://btholt.github.io/complete-intro-to-containers/
 
+[Kubernetes on cgroup V2](https://youtu.be/u8h0e84HxcE)
+
+https://youtu.be/u8h0e84HxcE
+
+
 
 
 ## About the author
