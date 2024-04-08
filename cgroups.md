@@ -522,9 +522,9 @@ This is a list of resources that were helpful in the creation of this guide:
 
 [Kubernetes On cgroup v2 - Giuseppe Scrivano, Red Hat (video)](https://youtu.be/u8h0e84HxcE)
 
-[Diving deeper into control groups (cgroups) v2 - Michael Kerrisk](https://youtu.be/Clr_MQwaJtA)
+[Diving deeper into control groups (cgroups) v2 - Michael Kerrisk (video)](https://youtu.be/Clr_MQwaJtA)
 
-[An introduction to control groups (cgroups) version 2 - Michael Kerrisk](https://youtu.be/kcnFQgg9ToY)
+[An introduction to control groups (cgroups) version 2 - Michael Kerrisk (video)](https://youtu.be/kcnFQgg9ToY)
 
 [cgroupv2: Linux's new unified control group hierarchy - Chris Down (video)](https://youtu.be/ikZ8_mRotT4)
 
