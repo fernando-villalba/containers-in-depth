@@ -88,7 +88,7 @@ Some of the files in the cgroup filesystem are read-only and dynamically show th
 
 You can directly write to these files to change the configuration of the cgroup. For example:
 
-`echo $$ > /sys/fs/cgroup/cgroups.procs` --> Adds your current shell process to the root cgroup.
+`echo $$ > /sys/fs/cgroup/cgroup.procs` --> Adds your current shell process to the root cgroup.
 
 `echo "max" > /sys/fs/cgroup/containers/pids.max` --> Sets the number of pids to the maximum allowed.
 
